@@ -15,7 +15,8 @@ def mapper():
     lats = [] # To store latitudes
     longs = [] # To store longitudes
     names = [] # To store the name of each LoRa GPS device
-    
+
+    # Processing data file
     file0 = open("store.txt", "r")
     lines = file0.readlines()
     for line in lines:
@@ -25,10 +26,11 @@ def mapper():
         names.append(thing[2])
     file0.close()
 
+    # Accessing map.png for background
     liveMap = plt.imread('map.png')
 
+    # Starting the first iteration before updates
     plt.ion()
-    print(longs)
     newLongs = []
     newLats = []
     for element in longs:
@@ -38,39 +40,63 @@ def mapper():
         
     # Bounding box to find the dimensions of the map to plot points on
     BBox = (min(newLongs), max(newLongs), min(newLats), max(newLats))
-    print("BBOX:", BBox)
     fig,ax = plt.subplots()
     ax.set_xlim((BBox[0]-0.00001), (BBox[1]+0.00001))
     ax.set_ylim((BBox[2]-0.00001), (BBox[3]+0.00001))
     ax.set_title("Live GPS Data")
+    deviceList = {}
+    numDiff = 0
+    for line in lines:
+        thing = line.split(", ")
+        newDevice = bytes(thing[2], 'utf-8')
+        newDevice = str(newDevice[0]) + str(newDevice[1])
+        if newDevice not in deviceList.keys():
+            numDiff += 1
+            deviceList[newDevice] = ''
     ax.imshow(liveMap, zorder=0, extent=BBox, aspect='equal')
-    ax.plot(newLongs, newLats, marker='v', color='firebrick')
+    for device in deviceList:
+        newLats = []
+        newLongs = []
+        for line in lines:
+            thing = line.split(", ")
+            ID = bytes(thing[2], 'utf-8')
+            if (str(ID[0]) + str(ID[1])) == device:
+                newLats.append(float(thing[0]))
+                newLongs.append(float(thing[1]))
+            deviceName = "Device " + device
+            # Updating the map with all the new data
+        ax.plot(newLongs, newLats, marker='v', label=deviceName)
+    ax.legend(loc='right')
     plt.pause(0.1)
-    
+
     # Loop to live-update the location data from the LoRa
     for _ in range(50):
+        # Clear the plot and renew it each time to avoid repeating 
+        ax.cla()
+        ax.imshow(liveMap, zorder=0, extent=BBox, aspect='equal')
         # Get new data that was written to .txt file every 20 seconds
         numDiff = 0
         deviceList = {}
         file0 = open("store.txt", "r")
         lines = file0.readlines()
+        file0.close()
+        # Get new locations for any device
         for line in lines:
             thing = line.split(", ")
             newDevice = bytes(thing[2], 'utf-8')
             newDevice = str(newDevice[0]) + str(newDevice[1])
-            print(newDevice)
             if newDevice not in deviceList.keys():
                 numDiff += 1
                 deviceList[newDevice] = ''
-        print(len(deviceList))
         for device in deviceList:
             newLats = []
             newLongs = []
             for line in lines:
                 thing = line.split(", ")
-                newLats.append(float(thing[0]))
-                newLongs.append(float(thing[1]))
-                file0.close()
+                ID = bytes(thing[2], 'utf-8')
+                if (str(ID[0]) + str(ID[1])) == device:
+                    newLats.append(float(thing[0]))
+                    newLongs.append(float(thing[1]))
             deviceName = "Device " + device
             # Updating the map with all the new data
             ax.plot(newLongs, newLats, marker='v', label=deviceName)
@@ -81,7 +107,7 @@ def mapper():
         fig.canvas.draw()
         fig.canvas.flush_events()
         plt.pause(10)
-        # Clear the plot and renew it each time to avoid repeating 
         ax.cla()
         ax.imshow(liveMap, zorder=0, extent=BBox, aspect='equal')
 mapper()
+
